@@ -42,8 +42,63 @@ if not os.environ.get("API_KEY"):
 @app.route("/")
 @login_required
 def index():
-    """Show portfolio of stocks"""
-    return apology("TODO")
+    # Join users and purchses table together
+    master_sheet = db.execute("SELECT cash, symbol, price, quantity FROM users JOIN purchases WHERE id = user_id")
+
+    # Extract only unique symbols from joined table
+    stocks = db.execute("SELECT DISTINCT symbol FROM users JOIN purchases WHERE id = user_id")
+
+    stocks_quantities = {}
+    stocks_current_price = {}
+    stocks_total_value = {}
+
+    # Add up quantities of stocks
+    for i in range(len(stocks)):
+        symbol = stocks[i]['symbol']
+
+        # Query for all quantities in each individual purchase of this stock
+        quantities = db.execute("SELECT quantity FROM users JOIN purchases WHERE id = user_id AND symbol = :symbol",
+        symbol = symbol)
+
+        quantity = 0
+
+        # Sum of quantities
+        for j in range(len(quantities)):
+            quantity = quantity + quantities[j]['quantity']
+
+        # Add stock symbol and quantitiy to dict
+        stocks_quantities[symbol] = quantity
+
+        # Query lookup function for current price of stock
+        quote = lookup(symbol)
+        current_price = quote['price']
+        stocks_current_price[symbol] = current_price
+
+        # Calculate total value of this stock owned
+        stocks_total_value[symbol] = (current_price * quantity)
+
+    if db.execute("SELECT * FROM home") != 0:
+        db.execute("DELETE FROM home")
+
+    for k in range(len(stocks)):
+        symbol = stocks[k]['symbol']
+        db.execute("INSERT INTO home (symbol, quantity, current_price, total_value_owned) VALUES (:symbol, :quantity, :current_price, :total_value_owned)",
+        symbol = symbol, quantity = stocks_quantities[symbol], current_price = usd(stocks_current_price[symbol]), total_value_owned = usd(stocks_total_value[symbol]))
+
+    table = db.execute("SELECT * FROM home")
+
+    cash = db.execute("SELECT cash FROM users WHERE id = :user_id", user_id = session.get("user_id"))
+
+    balance = cash[0]['cash']
+
+    grand_total = cash[0]['cash']
+
+    for l in range(len(stocks)):
+        symbol = stocks[l]['symbol']
+        grand_total = grand_total + (stocks_current_price[symbol] * stocks_quantities[symbol])
+
+    return render_template("index.html", table = table, grand_total = usd(grand_total), balance = usd(balance))
+
 
 
 @app.route("/buy", methods=["GET", "POST"])
@@ -66,20 +121,27 @@ def buy():
 
         price = quote['price']
 
-        # Check the user has enough cash
-        if cash < price:
-            return apology("You dont have enough money to make this transaction")
-
-        shares = request.form.get("shares")
+        quantity = int(request.form.get("shares"))
 
         # Check for corerct format of shares input
-        if not shares or not shares.isdigit() or int(shares) <= 0:
+        if not quantity or quantity <= 0:
             return apology("Provide positive integer for shares you wish to purchase")
 
-        # Insert record of purchase into purchases table
+        # Check the user has enough cash
+        if cash < (price * quantity):
+            return apology("You dont have enough money to make this transaction")
+
         else:
-            db.execute("INSERT INTO purchases (user_id, symbol, price) VALUES (:user_id, :symbol, :price)",
-            user_id = session.get("user_id"), symbol = symbol, price = price)
+            # Insert record of purchase into purchases table
+            db.execute("INSERT INTO purchases (user_id, symbol, price, quantity) VALUES (:user_id, :symbol, :price, :quantity)",
+            user_id = session.get("user_id"), symbol = symbol, price = price, quantity = quantity)
+
+            row = db.execute("SELECT * FROM users WHERE id = :user_id", user_id = session.get("user_id"))
+            cash = row[0]['cash']
+            new_cash = cash - (price * quantity)
+
+            # Update users cash balance
+            db.execute("UPDATE users SET cash = :new_cash", new_cash = new_cash)
             return redirect("/")
 
     else:
