@@ -57,17 +57,29 @@ def index():
         symbol = stocks[i]['symbol']
 
         # Query for all quantities in each individual purchase of this stock
-        quantities = db.execute("SELECT quantity FROM users JOIN purchases WHERE id = user_id AND symbol = :symbol",
-        symbol = symbol)
+        quantities_bought = db.execute("SELECT quantity FROM users JOIN purchases WHERE id = user_id AND user_id = :user_id AND symbol = :symbol",
+        user_id = session.get("user_id"), symbol = symbol)
 
-        quantity = 0
+        quantity_purchased = 0
 
         # Sum of quantities
-        for j in range(len(quantities)):
-            quantity = quantity + quantities[j]['quantity']
+        for j in range(len(quantities_bought)):
+            quantity_purchased = quantity_purchased + quantities_bought[j]['quantity']
+
+        # Query sales table
+        quantities_sold = db.execute("Select quantity FROM users JOIN sales WHERE id = user_id AND user_id = :user_id AND symbol = :symbol",
+        user_id = session.get("user_id"), symbol = symbol)
+
+        quantity_sold = 0
+
+        # Sum of sales
+        for i in range(len(quantities_sold)):
+            quantity_sold = quantity_sold + quantities_sold[i]['quantity']
 
         # Add stock symbol and quantitiy to dict
-        stocks_quantities[symbol] = quantity
+        stocks_quantities[symbol] = quantity_purchased - quantity_sold
+
+        quantity = stocks_quantities[symbol]
 
         # Query lookup function for current price of stock
         quote = lookup(symbol)
@@ -81,7 +93,14 @@ def index():
         db.execute("DELETE FROM home")
 
     for k in range(len(stocks)):
+
         symbol = stocks[k]['symbol']
+
+        # Check that the user owns any of the specified stock
+        if stocks_quantities[symbol] <= 0:
+            continue
+
+        # Insert data for current stock into home table
         db.execute("INSERT INTO home (symbol, quantity, current_price, total_value_owned) VALUES (:symbol, :quantity, :current_price, :total_value_owned)",
         symbol = symbol, quantity = stocks_quantities[symbol], current_price = usd(stocks_current_price[symbol]), total_value_owned = usd(stocks_total_value[symbol]))
 
@@ -274,9 +293,55 @@ def register():
 @app.route("/sell", methods=["GET", "POST"])
 @login_required
 def sell():
-    """Sell shares of stock"""
-    return apology("TODO")
 
+    if request.method == "POST":
+
+        symbol = request.form.get("symbol")
+
+        stocks_owned = db.execute("SELECT * FROM home WHERE symbol = :symbol", symbol = symbol)
+
+        # Ensure user selects stock symbol and that user owns some of that stock
+        if not symbol or not stocks_owned:
+            return apology("Must select stock to sell")
+
+        quantity_to_sell = request.form.get("shares")
+
+        # Ensure user enters positive int
+        if not str.isdigit(quantity_to_sell) or int(quantity_to_sell) <= 0:
+            return apology("Must enter positive integer value for shares to sell")
+
+        quantity_to_sell = int(quantity_to_sell)
+
+        amount_owned = stocks_owned[0]['quantity']
+
+        # Check user owns enough stock to make sale
+        if quantity_to_sell > amount_owned:
+            return apology("Not enough stock to make sale")
+
+        stock = lookup(symbol)
+
+        price = stock['price']
+
+        # Query users to get info on current user
+        user_table = db.execute("SELECT * FROM users WHERE id = :user_id", user_id = session.get("user_id"))
+
+        cash_before_sale = user_table[0]['cash']
+
+        sale_value = quantity_to_sell * price
+
+        # Update users cash balance
+        db.execute("UPDATE users SET cash = :cash_after_sale",
+        cash_after_sale = (cash_before_sale + sale_value))
+
+        # Update sales table
+        db.execute("INSERT INTO sales (user_id, symbol, price, quantity) VALUES (:user_id, :symbol, :price, :quantity)",
+        user_id = session.get("user_id"), symbol = symbol, price = price, quantity = quantity_to_sell)
+
+        return redirect("/")
+
+    else:
+        rows = db.execute("SELECT symbol FROM home")
+        return render_template("sell.html", rows = rows)
 
 def errorhandler(e):
     """Handle error"""
