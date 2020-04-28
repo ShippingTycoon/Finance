@@ -192,11 +192,13 @@ def buy():
 
         price = quote['price']
 
-        quantity = int(request.form.get("shares"))
+        quantity = request.form.get("shares")
 
         # Check for corerct format of shares input
-        if not quantity or quantity <= 0:
+        if not quantity or not str.isdigit(quantity) or int(quantity) <= 0:
             return apology("Provide positive integer for shares you wish to purchase")
+
+        quantity = int(quantity)
 
         # Check the user has enough cash
         if cash < (price * quantity):
