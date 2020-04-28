@@ -170,9 +170,29 @@ def buy():
 @app.route("/history")
 @login_required
 def history():
-    """Show history of transactions"""
-    return apology("TODO")
 
+    user_id = session.get("user_id")
+
+    # Get list of purchases
+    purchases = db.execute("SELECT * FROM purchases WHERE user_id = :user_id", user_id = user_id)
+
+    # Get list of sales
+    sales = db.execute("SELECT * FROM sales where user_id = :user_id", user_id = user_id)
+
+    if db.execute("SELECT * FROM history") != 0:
+        db.execute("DELETE FROM history")
+
+    for row in sales:
+        db.execute("INSERT INTO history (bought_sold, symbol, price, quantity, time) VAlUES (:bought_sold, :symbol, :price, :quantity, :time)",
+        bought_sold = "Sold", symbol = row['symbol'], price = row['price'], quantity = row['quantity'], time = row['time'])
+
+    for row in purchases:
+        db.execute("INSERT INTO history (bought_sold, symbol, price, quantity, time) VAlUES (:bought_sold, :symbol, :price, :quantity, :time)",
+        bought_sold = "Bought", symbol = row['symbol'], price = row['price'], quantity = row['quantity'], time = row['time'])
+
+    history = db.execute("SELECT * FROM history")
+
+    return render_template("history.html", history = history)
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
