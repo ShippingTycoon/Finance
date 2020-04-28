@@ -119,6 +119,58 @@ def index():
     return render_template("index.html", table = table, grand_total = usd(grand_total), balance = usd(balance))
 
 
+# Personal Touch change password
+@app.route("/change_password", methods=["GET", "POST"])
+@login_required
+def change_password():
+
+    if request.method == "POST":
+
+        password = request.form.get("password")
+
+        # Ensure user entered password
+        if not password:
+            return apology("Type your correct password")
+
+        user_id = session.get("user_id")
+
+        # query database for users current hashed password
+        hashed_val = db.execute("SELECT * FROM users WHERE id = :user_id", user_id = user_id)
+
+        hashed_password = hashed_val[0]['hash']
+
+        # Check user has entered their password correctly
+        if check_password_hash(hashed_password, password) == True:
+            current_password = check_password_hash(hashed_password, password)
+        else:
+            return apology("Incorrect current password")
+
+        new_password = request.form.get("new_password")
+
+        # Ensure user enters new password
+        if not new_password:
+            return apology("Must enter new password")
+
+        confirmation = request.form.get("confirmation")
+
+        # Ensure user enters new password confirmation
+        if not confirmation:
+            return apology("Must confirm new password")
+
+        # Ensure new password and confirmation match
+        if new_password != confirmation:
+            return apology("New password and confirmation fields do not match")
+
+        hashed_password = generate_password_hash(new_password)
+
+        # Update hashed password in users table
+        db.execute("UPDATE users SET hash = :hashed_password WHERE id = :user_id",
+        hashed_password = hashed_password, user_id = user_id)
+
+        return redirect("/logout")
+
+    else:
+        return render_template("change_password.html")
 
 @app.route("/buy", methods=["GET", "POST"])
 @login_required
@@ -190,7 +242,7 @@ def history():
         db.execute("INSERT INTO history (bought_sold, symbol, price, quantity, time) VAlUES (:bought_sold, :symbol, :price, :quantity, :time)",
         bought_sold = "Bought", symbol = row['symbol'], price = row['price'], quantity = row['quantity'], time = row['time'])
 
-    history = db.execute("SELECT * FROM history")
+    history = db.execute("SELECT * FROM history ORDER BY time DESC")
 
     return render_template("history.html", history = history)
 
