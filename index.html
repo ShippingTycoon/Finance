@@ -1,0 +1,34 @@
+{% extends "layout.html" %}
+
+{% block title %}
+    Home
+{% endblock %}
+
+{% block main %}
+    <h1>Home</h1>
+    <table>
+        <tr>
+            <th id="header_symbol">Symbol</th>
+            <th id="header_quantity">Quantity</th>
+            <th id="header_price">Current Price</th>
+            <th id="header_total_value_owned">Total Value Owned</th>
+        </tr>
+        {% for row in table %}
+            <tr>
+                <td> {{ row["symbol"] }} </td>
+                <td> {{ row["quantity"] }} </td>
+                <td> {{ row["current_price"] }} </td>
+                <td> {{ row["total_value_owned"] }} </td>
+            </tr>
+        {% endfor %}
+        <tr>
+            <th>Cash Balance</th>
+            <td> {{ balance }} </td>
+        </tr>
+        <tr>
+            <th>Grand Total</th>
+            <td> {{ grand_total }} </td>
+        </tr>
+    </table>
+
+{% endblock %}

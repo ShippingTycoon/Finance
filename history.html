@@ -1,0 +1,28 @@
+{% extends "layout.html" %}
+
+{% block title %}
+    History
+{% endblock %}
+
+{% block main %}
+    <h1>History</h1>
+    <table>
+        <tr>
+            <th id="header_symbol">Bought/Sold</th>
+            <th id="header_quantity">Symbol</th>
+            <th id="header_price">Price</th>
+            <th id="header_total_value_owned">Quantity</th>
+            <th>Date & Time</th>
+        </tr>
+        {% for row in history %}
+            <tr>
+                <td> {{ row["bought_sold"] }} </td>
+                <td> {{ row["symbol"] }} </td>
+                <td> {{ row["price"] }} </td>
+                <td> {{ row["quantity"] }} </td>
+                <td> {{ row["time"] }} </td>
+            </tr>
+        {% endfor %}
+    </table>
+
+{% endblock %}
